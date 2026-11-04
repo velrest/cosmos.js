@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Prompt survives a rebuild</title>
+<body>
+<script type="module">
+  import { initializeCosmos } from "../../src/index.js";
+  import { check, run, wait } from "./harness.js";
+
+  run(async () => {
+    await initializeCosmos({}, { simulatedLocation: { lat: 90, lon: 0 } });
+    document.body.innerHTML = "<p>The host page replaced everything</p>";
+    await wait(1500);
+    check("the prompt comes back", document.querySelectorAll("[data-stellar-oracle]").length === 1);
+  });
+</script>

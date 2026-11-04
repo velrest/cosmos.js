@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Reload test</title>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos, sendEnergyToStar } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  const POLE = { lat: 90, lon: 0 };
+
+  if (!sessionStorage.getItem("saved")) {
+    const records = await openAkashicRecords();
+    records.save({ stars: {}, soul: { energy: 80, streak: 0 }, omen: null, nextOmenAt: null, location: null, settledAt: Date.now() });
+    await records.quiet();
+    await initializeCosmos({}, { simulatedLocation: POLE });
+    sendEnergyToStar("Polaris", { v: 1 });
+    sessionStorage.setItem("saved", "yes");
+    location.reload();
+  } else {
+    run(async () => {
+      const state = await (await openAkashicRecords()).load();
+      const polaris = state.stars.Polaris;
+      check("a save survives an immediate reload", polaris?.pending.length === 1 || polaris?.data?.v === 1);
+    });
+  }
+</script>

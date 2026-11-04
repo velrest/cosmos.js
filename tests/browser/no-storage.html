@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>No storage test</title>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos, gazeIntoStar } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    Object.defineProperty(globalThis, "indexedDB", {
+      get() {
+        throw new Error("no storage here");
+      },
+    });
+    const records = await openAkashicRecords();
+    records.save({ a: 1 });
+    await records.quiet();
+    check("the fallback store keeps data", (await records.load()).a === 1);
+    await initializeCosmos({ Polaris: { v: 1 } }, { simulatedLocation: { lat: 90, lon: 0 } });
+    check("the framework works without IndexedDB", gazeIntoStar("Polaris").v === 1);
+  });
+</script>

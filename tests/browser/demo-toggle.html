@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Demo toggle test</title>
+<iframe id="demo" src="../../demo/index.html" width="900" height="900"></iframe>
+<script type="module">
+  import { check, run, wait } from "./harness.js";
+
+  const frame = document.querySelector("#demo");
+
+  async function demoReady(testParam) {
+    for (let i = 0; i < 150; i++) {
+      const page = frame.contentDocument;
+      const matches = new URLSearchParams(frame.contentWindow.location.search).get("test") === testParam;
+      if (matches && page?.body?.hasAttribute("data-demo-ready")) return page;
+      await wait(100);
+    }
+    throw new Error(`The demo never became ready with test=${testParam}`);
+  }
+
+  function fateLabels(page) {
+    const shadow = page.querySelector("[data-stellar-oracle]").shadowRoot;
+    shadow.querySelector("[data-opener]").click();
+    return shadow.querySelectorAll("[data-fate]").length;
+  }
+
+  function clickGlobe(page) {
+    const globe = page.querySelector("#globe");
+    const box = globe.getBoundingClientRect();
+    const spot = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, pointerId: 1, bubbles: true };
+    globe.dispatchEvent(new PointerEvent("pointerdown", spot));
+    globe.dispatchEvent(new PointerEvent("pointerup", spot));
+  }
+
+  run(async () => {
+    let page = await demoReady(null);
+    check("test mode starts on", page.querySelector("#test-mode").checked);
+    check("the globe is shown", !page.querySelector("#globe").hidden);
+    check("the location is simulated", page.querySelector("#place").textContent.startsWith("Simulated"));
+    check("fates are shown", fateLabels(page) === 3);
+
+    page.querySelector("#test-mode").click();
+    await wait(100);
+    page = await demoReady("off");
+    check("test mode is off after reload", !page.querySelector("#test-mode").checked);
+    check("the globe is still shown", !page.querySelector("#globe").hidden);
+    check("the real location button is hidden", page.querySelector("#use-real").hidden);
+    check("the real location is used", page.querySelector("#place").textContent.startsWith("Your real location"));
+    check("fates are hidden", fateLabels(page) === 0);
+    const place = page.querySelector("#place");
+    for (let i = 0; i < 170 && !place.textContent.includes("isn't available"); i++) await wait(100);
+    check("a location failure is explained on the page", place.textContent.includes("isn't available"));
+    check("the page says it fell back to Taipei", place.textContent.includes("Taipei"));
+    check("the sky is shown for the fallback location", page.querySelectorAll("#visible-stars li").length > 100);
+
+    const searchBefore = frame.contentWindow.location.search;
+    clickGlobe(page);
+    await wait(500);
+    check("clicking the globe does nothing", frame.contentWindow.location.search === searchBefore);
+
+    page.querySelector("#test-mode").click();
+    await wait(100);
+    page = await demoReady(null);
+    check("test mode comes back on", page.querySelector("#test-mode").checked);
+
+    clickGlobe(page);
+    for (let i = 0; i < 50 && !frame.contentWindow.location.search.includes("lat="); i++) await wait(100);
+    check("in test mode, clicking the globe picks a location", frame.contentWindow.location.search.includes("lat="));
+  });
+</script>

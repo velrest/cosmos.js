@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cosmos.js demo</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1026'/%3E%3Cpolyline points='46,14 26,12 13,27 16,44 34,52 49,46' fill='none' stroke='%239db4e8' stroke-width='3' stroke-linejoin='round'/%3E%3Cg fill='%23f4d58d'%3E%3Ccircle cx='26' cy='12' r='3.5'/%3E%3Ccircle cx='13' cy='27' r='4'/%3E%3Ccircle cx='16' cy='44' r='3.5'/%3E%3Ccircle cx='34' cy='52' r='4'/%3E%3Ccircle cx='49' cy='46' r='3.5'/%3E%3Cpath d='M46 2C47 10 50 13 58 14C50 15 47 18 46 26C45 18 42 15 34 14C42 13 45 10 46 2Z'/%3E%3C/g%3E%3C/svg%3E" />
+<style>
+  :root {
+    color-scheme: dark; --night: #070b1e; --panel: #0f1533; --line: #2c3562; --text: #e8e6f0; --dim: #a9aecb; --gold: #f4d58d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 96px; color: var(--text); background: var(--night);
+    font: 16px/1.5 Georgia, "Times New Roman", serif;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  [hidden] { display: none !important; }
+  h1 { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--gold); font-size: 32px; font-weight: normal; }
+  h1 svg { flex: none; border: 1px solid var(--line); border-radius: 10px; }
+  label.toggle { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 24px; color: var(--text); font-size: 15px; cursor: pointer; }
+  .toggle input { flex: none; width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--gold); }
+  h2 { margin: 0 0 8px; color: var(--gold); font-size: 18px; font-weight: normal; }
+  .intro { margin: 4px 0 12px; color: var(--dim); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+  section { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); min-width: 0; }
+  canvas { display: block; width: min(240px, 100%); aspect-ratio: 1; margin: 0 auto 8px; touch-action: none; }
+  pre { margin: 0; max-height: 260px; overflow: auto; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .note { min-height: 22px; color: var(--dim); font-size: 14px; }
+  .stat { font-size: 22px; color: var(--gold); }
+  label { display: block; margin: 8px 0 4px; color: var(--dim); font-size: 14px; }
+  input, textarea, button { font: inherit; color: var(--text); border-radius: 6px; border: 1px solid var(--line); background: #151b3c; }
+  input, textarea { width: 100%; padding: 8px; }
+  textarea { min-height: 70px; font: 13px ui-monospace, Menlo, Consolas, monospace; }
+  button { margin-top: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { background: #20285a; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  ul { margin: 0 0 8px; padding-left: 20px; }
+  .center { text-align: center; }
+  .wide { grid-column: 1 / -1; }
+  #read-result, #cosmos-result { margin-top: 8px; }
+  #visible-stars .faded { opacity: 0.4; }
+  #visible-stars { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); column-gap: 16px; max-height: 280px; margin: 8px 0 0; padding: 0; overflow: hidden auto; list-style: none; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  .load-failed { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #f87171; border-radius: 8px; }
+  .load-failed a { color: var(--gold); }
+</style>
+</head>
+<body>
+<main>
+  <h1>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#0b1026"/>
+      <polyline points="46,14 26,12 13,27 16,44 34,52 49,46" fill="none" stroke="#9db4e8" stroke-width="3" stroke-linejoin="round"/>
+      <g fill="#f4d58d">
+        <circle cx="26" cy="12" r="3.5"/>
+        <circle cx="13" cy="27" r="4"/>
+        <circle cx="16" cy="44" r="3.5"/>
+        <circle cx="34" cy="52" r="4"/>
+        <circle cx="49" cy="46" r="3.5"/>
+        <path d="M46 2C47 10 50 13 58 14C50 15 47 18 46 26C45 18 42 15 34 14C42 13 45 10 46 2Z"/>
+      </g>
+    </svg>
+    cosmos.js
+  </h1>
+  <p class="intro">Data lives on real stars. Your sky decides what you can read, and your energy decides what you can do. Use the ✦ button at the bottom right to read the stars.</p>
+  <label class="toggle"><input type="checkbox" id="test-mode" /> Test mode: fate hints, manual location, and prompts for Ascended users</label>
+  <p id="load-failed" class="load-failed" role="alert" hidden>The demo's script was blocked, which browsers do when this page is opened directly from disk. Open <a href="../gist/index.html">gist/index.html</a> instead, or serve the project with a static server, such as <code>python3 -m http.server</code>.</p>
+  <div class="grid">
+    <section class="center">
+      <h2>Where you stand</h2>
+      <canvas id="globe" width="240" height="240" role="img" aria-label="Globe. Drag to rotate, click to pick a location."></canvas>
+      <div class="note" id="place"></div>
+      <button id="use-real" type="button">Use my real location</button>
+    </section>
+    <section>
+      <h2>Your energy</h2>
+      <div class="stat" id="energy">...</div>
+      <div class="note" id="level"></div>
+      <h2 style="margin-top: 16px">Your sky</h2>
+      <pre id="sky">...</pre>
+    </section>
+    <section>
+      <h2>People on Sirius</h2>
+      <ul id="people"></ul>
+      <div class="note" id="people-note"></div>
+      <form id="add-person">
+        <label for="person-name">Add a person (needs Aware or higher)</label>
+        <input id="person-name" required autocomplete="off" />
+        <button>Send to Sirius</button>
+      </form>
+    </section>
+    <section>
+      <h2>Send energy to a star</h2>
+      <form id="save-form">
+        <label for="save-star">Star name (empty means a random unnamed star)</label>
+        <input id="save-star" placeholder="Vega" autocomplete="off" />
+        <label for="save-data">JSON object or array</label>
+        <textarea id="save-data">{ "note": "Hello from Earth" }</textarea>
+        <button>Send</button>
+      </form>
+      <div class="note" id="save-note" role="status"></div>
+    </section>
+    <section class="wide">
+      <h2>Gaze into a star</h2>
+      <form id="read-form">
+        <label for="read-star">Star name (empty means a random unnamed star)</label>
+        <input id="read-star" placeholder="Polaris" autocomplete="off" />
+        <button>Gaze</button>
+      </form>
+      <pre id="read-result" role="status"></pre>
+    </section>
+    <section class="wide">
+      <h2>Gaze into the cosmos</h2>
+      <form id="cosmos-form">
+        <label for="cosmos-name">Constellation name or code (empty means the whole sky)</label>
+        <input id="cosmos-name" placeholder="Orion" autocomplete="off" />
+        <button>Gaze</button>
+      </form>
+      <pre id="cosmos-result" role="status"></pre>
+    </section>
+    <section class="wide">
+      <h2>Star map (admin)</h2>
+      <div id="star-map"></div>
+    </section>
+    <section class="wide">
+      <h2>Visible stars</h2>
+      <div class="note" id="visible-count"></div>
+      <ul id="visible-stars" tabindex="0" aria-label="Visible stars"></ul>
+    </section>
+  </div>
+</main>
+<script type="module" src="./demo.js" onerror="document.getElementById('load-failed').hidden = false"></script>
+</body>
+</html>

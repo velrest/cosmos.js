@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Read and write Vega test</title>
+<body>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { check, run, wait } from "./harness.js";
+
+  // Vega never sets at the north pole, so only energy decides this.
+  async function tryLevel(energy, streak) {
+    const records = await openAkashicRecords();
+    records.save({ stars: {}, soul: { energy, streak }, omen: null, nextOmenAt: null, location: null, settledAt: Date.now() });
+    await records.quiet();
+    const frame = document.createElement("iframe");
+    frame.src = "../../demo/index.html?lat=90&lon=0";
+    document.body.append(frame);
+    for (let i = 0; i < 100 && !frame.contentDocument?.body?.hasAttribute("data-demo-ready"); i++) await wait(100);
+    const page = frame.contentDocument;
+    const result = page.querySelector("#read-result");
+    page.querySelector("#read-star").value = "Vega";
+    page.querySelector("#read-form").requestSubmit();
+    const before = result.textContent;
+    page.querySelector("#save-star").value = "Vega";
+    page.querySelector("#save-data").value = `{ "written": ${energy} }`;
+    page.querySelector("#save-form").requestSubmit();
+    const note = page.querySelector("#save-note").textContent;
+    for (let i = 0; i < 80 && !result.textContent.includes(`"written": ${energy}`); i++) await wait(100);
+    const after = result.textContent;
+    frame.remove();
+    await wait(400);
+    return { before, note, after };
+  }
+
+  run(async () => {
+    const unconnected = await tryLevel(35, 0);
+    check("an Unconnected save is dropped", unconnected.note.startsWith("Dropped") && !unconnected.after.includes("written"));
+    check("a dropped save gives your energy and what's needed", unconnected.note.includes("35") && unconnected.note.includes("50"));
+    for (const [energy, streak] of [[60, 0], [80, 0], [90, 3]]) {
+      const outcome = await tryLevel(energy, streak);
+      check(`energy ${energy}: the save is accepted and says when it arrives`, /^Sent to Vega\. It arrives in about \d+/.test(outcome.note));
+      check(`energy ${energy}: the read doesn't change at once`, !outcome.before.includes(`"written": ${energy}`));
+      check(`energy ${energy}: the read updates on arrival`, outcome.after.includes(`"written": ${energy}`));
+    }
+  });
+</script>

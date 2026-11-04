@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Reveal test</title>
+<script type="module">
+  import { initializeCosmos } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    await initializeCosmos({}, { revealFates: true, simulatedLocation: { lat: 90, lon: 0 } });
+    const shadow = document.querySelector("[data-stellar-oracle]").shadowRoot;
+    shadow.querySelector("[data-opener]").click();
+    const labels = [...shadow.querySelectorAll("[data-sign] [data-fate]")].map((label) => label.textContent).sort();
+    check("each fate is labeled once", labels.join() === "negative,neutral,positive");
+    const buttons = [...shadow.querySelectorAll("[data-sign]")];
+    const colors = new Set(buttons.map((button) => getComputedStyle(button).borderColor));
+    check("each fate has its own color", colors.size === 3);
+  });
+</script>

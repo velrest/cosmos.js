@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Prompt test</title>
+<style>
+  button { display: none; }
+</style>
+<script>
+  // A classic script in head, so this starts before the body exists.
+  window.startedWithoutBody = document.body === null;
+  window.cosmosReady = import("../../src/index.js").then(({ initializeCosmos }) =>
+    initializeCosmos({}, { simulatedLocation: { lat: 90, lon: 0 } }),
+  );
+</script>
+<body>
+<script type="module">
+  import { check, run, wait } from "./harness.js";
+
+  run(async () => {
+    await window.cosmosReady;
+    check("init started before the body existed", window.startedWithoutBody);
+    await wait(100);
+    const hosts = document.querySelectorAll("[data-stellar-oracle]");
+    check("exactly one prompt", hosts.length === 1);
+    const shadow = hosts[0].shadowRoot;
+    const opener = shadow.querySelector("[data-opener]");
+    check("host CSS does not hide the button", getComputedStyle(opener).display !== "none");
+
+    opener.click();
+    const signs = () => [...shadow.querySelectorAll("[data-sign]")];
+    check("3 signs appear", signs().length === 3);
+    const panel = shadow.querySelector("[role=dialog]");
+    check("no fate labels without revealFates", !/positive|negative|neutral/i.test(panel.textContent));
+
+    const before = signs().map((s) => s.dataset.sign).join();
+    signs()[0].click();
+    const text = shadow.querySelector("[data-result]").textContent;
+    check("a result is shown", ["Energy rises", "Energy falls hard", "Energy falls a little"].includes(text));
+    check("new signs are ready, for fast clicking", signs().length === 3 && signs().map((s) => s.dataset.sign).join() !== before);
+    check("no numeric energy is shown", !/\d/.test(panel.textContent));
+
+    shadow.querySelector("[data-closer]").click();
+    check("the prompt can be closed", signs().length === 0);
+  });
+</script>

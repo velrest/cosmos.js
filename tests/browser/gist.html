@@ -1,0 +1,66 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Gist test</title>
+<iframe id="gist" src="../../gist/index.html" width="900" height="900"></iframe>
+<script type="module">
+  import { check, run, wait } from "./harness.js";
+
+  run(async () => {
+    const frame = document.querySelector("#gist");
+    let page;
+    for (let i = 0; i < 100; i++) {
+      page = frame.contentDocument;
+      if (page?.body?.hasAttribute("data-demo-ready")) break;
+      await wait(100);
+    }
+    check("the demo starts from one flat file", page.body.hasAttribute("data-demo-ready"));
+    check("the file loads no other scripts", !page.querySelector("script[src]") && !/from "\.\.?\//.test(page.documentElement.innerHTML));
+    check("seeded star data is shown", page.querySelector("#sky").textContent.includes("Polaris"));
+    const visible = [...page.querySelectorAll("#visible-stars li")];
+    check("visible stars are listed", visible.length > 100);
+    check("the list includes Polaris", visible.some((item) => item.textContent.includes("Polaris")));
+    const shownTime = /, (\d+ ms|\d+ s|\d+ min|\d+ h( \d+ min)?)\)$/;
+    check("every listed star shows a travel time", visible.every((item) => shownTime.test(item.textContent)));
+    const listBox = page.querySelector("#visible-stars");
+    check("the list has no horizontal scrolling", listBox.scrollWidth <= listBox.clientWidth);
+    check("the count is shown", page.querySelector("#visible-count").textContent.includes(String(visible.length)));
+    const readResult = () => page.querySelector("#read-result").textContent;
+    const readFrom = (name) => {
+      page.querySelector("#read-star").value = name;
+      page.querySelector("#read-form").requestSubmit();
+    };
+    readFrom("Polaris");
+    check("the read widget shows a star's data", readResult().includes("Always up in the north"));
+    readFrom("Nonsense");
+    check("the read widget explains a failed read", readResult().includes("can't read"));
+    readFrom("");
+    check("an empty name reads a random unnamed star", readResult().trim() === "{}");
+    const cosmosResult = () => page.querySelector("#cosmos-result").textContent;
+    const readCosmos = (name) => {
+      page.querySelector("#cosmos-name").value = name;
+      page.querySelector("#cosmos-form").requestSubmit();
+    };
+    readCosmos("Ursa Minor");
+    check("the cosmos widget reads a constellation", cosmosResult().includes("Polaris") && !cosmosResult().includes("Vega"));
+    readCosmos("");
+    check("an empty name reads the whole sky", cosmosResult().includes("Polaris") && cosmosResult().includes("Vega"));
+    readCosmos("Nonsense");
+    check("the cosmos widget explains a failed read", cosmosResult().includes("can't read"));
+    const top = (selector) => page.querySelector(selector).getBoundingClientRect().top;
+    check("the cosmos widget is right below the star widget", top("#read-form") < top("#cosmos-form") && top("#cosmos-form") < top("#star-map"));
+    check("the read widget is above the map", page.querySelector("#read-form").getBoundingClientRect().top < page.querySelector("#star-map").getBoundingClientRect().top);
+    const map = page.querySelector("#star-map").shadowRoot;
+    check("the star map is locked for a new user", map.textContent.includes("Ascended") && map.querySelector("canvas").hidden);
+    const headings = [...page.querySelectorAll("h2")].map((heading) => heading.textContent);
+    for (const label of ["Gaze into a star", "Gaze into the cosmos", "Send energy to a star"]) {
+      check(`the demo has a "${label}" widget`, headings.includes(label));
+    }
+    check("the tab icon is embedded", page.querySelector("link[rel=icon]")?.getAttribute("href").startsWith("data:image/svg+xml"));
+    check("the logo is shown", Boolean(page.querySelector("h1 svg")));
+    check("the prompt is injected", page.querySelectorAll("[data-stellar-oracle]").length === 1);
+    const shadow = page.querySelector("[data-stellar-oracle]").shadowRoot;
+    shadow.querySelector("[data-opener]").click();
+    const fates = [...shadow.querySelectorAll("[data-fate]")].map((label) => label.textContent).sort().join();
+    check("fates are visibly marked", fates === "negative,neutral,positive");
+  });
+</script>

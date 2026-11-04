@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Sun on the star map test</title>
+<div id="map"></div>
+<script type="module">
+  import { localSiderealDegrees, whereIsTheSun } from "../../src/celestial-mechanics.js";
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos, renderCosmicPlane } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    const records = await openAkashicRecords();
+    const now = Date.now();
+    records.save({ stars: {}, soul: { energy: 90, streak: 3 }, omen: null, nextOmenAt: now + 1_800_000, location: null, settledAt: now });
+    await records.quiet();
+
+    // Stand directly under the sun, so it's at the center of the map.
+    const date = new Date();
+    const sun = whereIsTheSun(date);
+    const lon = ((sun.ra - localSiderealDegrees(date, 0) + 540) % 360) - 180;
+    await initializeCosmos({}, { simulatedLocation: { lat: sun.dec, lon } });
+    renderCosmicPlane(document.querySelector("#map"));
+
+    const canvas = document.querySelector("#map").shadowRoot.querySelector("canvas");
+    const [red, green, blue] = canvas.getContext("2d").getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
+    check("the sun is drawn as a bright yellow disc", red > 220 && green > 170 && blue < 170);
+  });
+</script>

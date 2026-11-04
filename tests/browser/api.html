@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>API test</title>
+<ul id="people"></ul>
+<script type="module">
+  import * as api from "../../src/index.js";
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { check, run, stubGeolocation, wait } from "./harness.js";
+
+  // Procyon is near, bright, and always up at the north pole.
+  const POLE = { lat: 90, lon: 0 };
+
+  run(async () => {
+    const stub = stubGeolocation({ latitude: 0, longitude: 0 });
+    for (const name of ["initializeCosmos", "gazeIntoConstellation", "gazeIntoStar", "sendEnergyToConstellations", "sendEnergyToStar", "gazeIntoSky", "gazeIntoSelf", "onCosmicShift", "scanHeavens"]) {
+      check(`${name} exists`, typeof api[name] === "function");
+    }
+    check("gazeIntoStar before init", api.gazeIntoStar("Sirius") === undefined);
+    check("sendEnergyToStar before init", api.sendEnergyToStar("Sirius", {}) === undefined);
+    check("gazeIntoSky before init", api.gazeIntoSky() === undefined);
+    check("gazeIntoConstellation before init", api.gazeIntoConstellation("Orion") === undefined);
+    check("sendEnergyToConstellations before init", api.sendEnergyToConstellations({}) === undefined);
+    check("gazeIntoSelf before init", api.gazeIntoSelf() === undefined);
+    check("onCosmicShift before init", api.onCosmicShift(() => {}) === undefined);
+    check("scanHeavens before init", api.scanHeavens() === undefined);
+
+    const records = await openAkashicRecords();
+    records.save({ stars: {}, soul: { energy: 80, streak: 0 }, omen: null, nextOmenAt: null, location: null, settledAt: Date.now() });
+    await records.quiet();
+
+    const first = api.initializeCosmos({ Procyon: [{ name: "Ada" }] }, { simulatedLocation: POLE });
+    const second = api.initializeCosmos({ Procyon: [{ name: "Ignored" }] });
+    check("repeated init returns the same promise", first === second);
+    await first;
+
+    check("simulated location never calls geolocation", stub.calls === 0);
+    check("seeded array is readable", api.gazeIntoStar("Procyon")[0].name === "Ada");
+    check("one prompt", document.querySelectorAll("[data-stellar-oracle]").length === 1);
+    check("energy from storage", api.gazeIntoSelf() === 80);
+    check("scanHeavens lists visible stars", api.scanHeavens().some((star) => star.name === "Procyon"));
+
+    const list = document.querySelector("#people");
+    const stop = api.onCosmicShift(() => {
+      const people = api.gazeIntoStar("Procyon");
+      list.innerHTML = people ? people.map((p) => `<li>${p.name}</li>`).join("") : "";
+    });
+    check("list renders at once", list.children.length === 1);
+
+    api.sendEnergyToStar("Procyon", [{ name: "Ada" }, { name: "Grace" }]);
+    check("list is unchanged before arrival", list.children.length === 1);
+    await wait(2000);
+    check("list updates by itself after arrival", list.children.length === 2);
+    stop();
+
+    const saved = await openAkashicRecords();
+    await wait(500);
+    const state = await saved.load();
+    check("state reaches IndexedDB", state.stars.Procyon.data.length === 2);
+    check("simulated location is not stored", state.location === null);
+  });
+</script>

@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Greyed out stars test</title>
+<body>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { check, run, wait } from "./harness.js";
+
+  async function openDemoWithEnergy(energy) {
+    const records = await openAkashicRecords();
+    records.save({ stars: {}, soul: { energy, streak: 0 }, omen: null, nextOmenAt: null, location: null, settledAt: Date.now() });
+    await records.quiet();
+    const frame = document.createElement("iframe");
+    frame.src = "../../demo/index.html";
+    document.body.append(frame);
+    for (let i = 0; i < 100; i++) {
+      if (frame.contentDocument?.body?.hasAttribute("data-demo-ready")) return frame;
+      await wait(100);
+    }
+    throw new Error("The demo never became ready");
+  }
+
+  run(async () => {
+    let frame = await openDemoWithEnergy(15);
+    let items = [...frame.contentDocument.querySelectorAll("#visible-stars li")];
+    const magnitude = (item) => Number(item.textContent.match(/mag (-?[\d.]+)/)[1]);
+    check("Hazed still lists faint stars", items.some((item) => magnitude(item) > 1.5));
+    check("Hazed greys out faint stars", items.filter((item) => magnitude(item) > 1.5).every((item) => item.classList.contains("faded")));
+    check("Hazed keeps the brightest stars normal", items.filter((item) => magnitude(item) <= 1.5).every((item) => !item.classList.contains("faded")));
+    const faded = frame.contentWindow.getComputedStyle(items.find((item) => item.classList.contains("faded"))).opacity;
+    check("greyed out stars look different", Number(faded) < 1);
+
+    const firstTime = items[0].textContent;
+    const shadow = frame.contentDocument.querySelector("[data-stellar-oracle]").shadowRoot;
+    shadow.querySelector("[data-opener]").click();
+    [...shadow.querySelectorAll("[data-sign]")].find((sign) => sign.textContent.includes("positive")).click();
+    const updated = frame.contentDocument.querySelector("#visible-stars li").textContent;
+    check("travel times update when energy changes", updated !== firstTime);
+    frame.remove();
+    await wait(400);
+
+    frame = await openDemoWithEnergy(5);
+    items = [...frame.contentDocument.querySelectorAll("#visible-stars li")];
+    check("Blinded still lists stars", items.length > 100);
+    check("Blinded greys out every star", items.every((item) => item.classList.contains("faded")));
+  });
+</script>

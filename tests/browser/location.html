@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Location test</title>
+<script type="module">
+  import { gazeIntoSelf, initializeCosmos, gazeIntoSky } from "../../src/index.js";
+  import { check, run, stubGeolocation } from "./harness.js";
+
+  run(async () => {
+    const stub = stubGeolocation(null);
+    const started = performance.now();
+    await initializeCosmos({ Polaris: { v: 1 } }, { simulatedLocation: { lat: 500, lon: 0 } });
+    check("an invalid simulated location falls back to geolocation", stub.calls === 1);
+    check("a silent geolocation still resolves after about 5 seconds", performance.now() - started < 6000);
+    check("no location means an empty sky", gazeIntoSky() === undefined);
+    check("energy works with no location", gazeIntoSelf() === 35);
+  });
+</script>

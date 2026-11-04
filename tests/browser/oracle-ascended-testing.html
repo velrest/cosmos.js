@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Ascended testing prompt test</title>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { gazeIntoSelf, initializeCosmos } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    const records = await openAkashicRecords();
+    records.save({ stars: {}, soul: { energy: 90, streak: 3 }, omen: null, nextOmenAt: Date.now() + 1_800_000, location: null, settledAt: Date.now() });
+    await records.quiet();
+
+    await initializeCosmos({}, { ascendedPrompts: true, revealFates: true, simulatedLocation: { lat: 90, lon: 0 } });
+    const shadow = document.querySelector("[data-stellar-oracle]").shadowRoot;
+    const opener = shadow.querySelector("[data-opener]");
+    check("the button stays enabled for Ascended users", !opener.disabled);
+
+    opener.click();
+    check("the prompt can be closed", !shadow.querySelector("[data-closer]").hidden);
+    const bad = [...shadow.querySelectorAll("[data-sign]")].find((sign) => sign.textContent.includes("negative"));
+    check("a negative sign is offered", Boolean(bad));
+    bad.click();
+    check("energy goes down", gazeIntoSelf() === 80);
+  });
+</script>

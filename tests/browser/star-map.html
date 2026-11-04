@@ -1,0 +1,87 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Star map test</title>
+<div id="map"></div>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos, renderCosmicPlane, sendEnergyToStar, pierceVeil } from "../../src/index.js";
+  import { polarPoint } from "../../src/star-map.js";
+  import { check, run, wait } from "./harness.js";
+
+  run(async () => {
+    check("renderCosmicPlane before init returns nothing", renderCosmicPlane(document.querySelector("#map")) === undefined);
+
+    const records = await openAkashicRecords();
+    const now = Date.now();
+    records.save({ stars: {}, soul: { energy: 90, streak: 3 }, omen: null, nextOmenAt: now + 1_800_000, location: null, settledAt: now });
+    await records.quiet();
+    await initializeCosmos(
+      { Polaris: { note: "Hello from Polaris" }, Procyon: { note: "Hello from Procyon" } },
+      { revealFates: true, ascendedPrompts: true, simulatedLocation: { lat: 90, lon: 0 } },
+    );
+
+    check("an invalid element returns nothing", renderCosmicPlane("nope") === undefined);
+    const stop = renderCosmicPlane(document.querySelector("#map"));
+    check("mounting returns a stop function", typeof stop === "function");
+
+    const shadow = document.querySelector("#map").shadowRoot;
+    const canvas = shadow.querySelector("canvas");
+    const details = shadow.querySelector("[data-details]");
+    check("the map is shown", !canvas.hidden && canvas.clientWidth > 0);
+    check("the map draws something", canvas.getContext("2d").getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data[3] > 0);
+
+    const mapWidth = document.querySelector("#map").getBoundingClientRect().width;
+    check("the map fills the widget's width", Math.abs(canvas.getBoundingClientRect().width - mapWidth) < 2);
+    check("the info is below the map", details.getBoundingClientRect().top >= canvas.getBoundingClientRect().bottom);
+
+    const buttons = () => [...shadow.querySelectorAll("[data-star]")];
+    check("stars holding data are listed", buttons().map((b) => b.dataset.star).sort().join() === "Polaris,Procyon");
+    buttons().find((b) => b.dataset.star === "Polaris").click();
+    check("choosing from the list shows stored data", details.textContent.includes("Hello from Polaris"));
+
+    const clickStar = (name) => {
+      const star = pierceVeil().stars.find((candidate) => candidate.name === name);
+      const box = canvas.getBoundingClientRect();
+      const radius = box.width / 2 - 24;
+      const point = polarPoint(star.altitude, star.azimuth);
+      canvas.dispatchEvent(new MouseEvent("click", {
+        clientX: box.left + box.width / 2 + point.x * radius,
+        clientY: box.top + box.height / 2 - point.y * radius,
+        bubbles: true,
+      }));
+    };
+    const pixelAt = (name) => {
+      const star = pierceVeil().stars.find((candidate) => candidate.name === name);
+      const point = polarPoint(star.altitude, star.azimuth);
+      const scale = canvas.width / canvas.getBoundingClientRect().width;
+      const size = canvas.getBoundingClientRect().width;
+      const radius = size / 2 - 24;
+      return canvas.getContext("2d").getImageData((size / 2 + point.x * radius) * scale, (size / 2 - point.y * radius) * scale, 1, 1).data;
+    };
+    const scale = canvas.width / canvas.getBoundingClientRect().width;
+    const labelSpot = canvas.getContext("2d").getImageData(canvas.width / 2 - 8 * scale, 4 * scale, 16 * scale, 16 * scale).data;
+    check("the north label is fully on the map", labelSpot.some((value, index) => index % 4 === 3 && value > 100));
+    const holding = pixelAt("Procyon");
+    check("a star with data is green", holding[1] > holding[0] + 60 && holding[1] > holding[2] + 30);
+    const empty = pixelAt("Capella");
+    check("a star without data is white", Math.abs(empty[0] - empty[1]) < 40 && Math.abs(empty[1] - empty[2]) < 40 && empty[0] > 150);
+    clickStar("Procyon");
+    check("clicking a star on the map shows stored data", details.textContent.includes("Hello from Procyon"));
+
+    sendEnergyToStar("Procyon", { note: "Updated" });
+    await wait(50);
+    check("saves on their way are shown", details.textContent.includes("On its way") && details.textContent.includes("Updated"));
+    for (let i = 0; i < 40 && details.textContent.includes("On its way"); i++) await wait(100);
+    check("the details update on arrival", details.textContent.includes("Updated") && !details.textContent.includes("Hello from Procyon"));
+
+    const oracle = document.querySelector("[data-stellar-oracle]").shadowRoot;
+    oracle.querySelector("[data-opener]").click();
+    [...oracle.querySelectorAll("[data-sign]")].find((sign) => sign.textContent.includes("negative")).click();
+    await wait(50);
+    check("losing Ascended locks the map", canvas.hidden && shadow.textContent.includes("Ascended"));
+    check("stored data is removed when locked", !details.textContent.includes("Updated"));
+
+    stop();
+    check("stop removes the map", shadow.querySelector("canvas") === null);
+  });
+</script>

@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Location failure test</title>
+<script type="module">
+  import * as cosmos from "../../src/index.js";
+
+  const { initializeCosmos, gazeIntoSky, channelLocation } = cosmos;
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    const warnings = [];
+    const realWarn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(" "));
+    Object.defineProperty(navigator, "geolocation", {
+      value: { watchPosition: (_success, failure) => failure({ code: 2, message: "No location provider" }) },
+    });
+    const started = performance.now();
+    await initializeCosmos({});
+    console.warn = realWarn;
+    check("init doesn't wait after a failure", performance.now() - started < 2000);
+    check("the failure is reported with its reason", warnings.some((text) => text.includes("No location provider")));
+    check("there is no sky without a location", gazeIntoSky() === undefined);
+    check("channelLocation is public, and empty with no location", typeof channelLocation === "function" && channelLocation() === undefined);
+  });
+</script>

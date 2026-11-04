@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>No sun at night on the star map test</title>
+<div id="map"></div>
+<script type="module">
+  import { localSiderealDegrees, whereIsTheSun } from "../../src/celestial-mechanics.js";
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos, renderCosmicPlane } from "../../src/index.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    const records = await openAkashicRecords();
+    const now = Date.now();
+    records.save({ stars: {}, soul: { energy: 90, streak: 3 }, omen: null, nextOmenAt: now + 1_800_000, location: null, settledAt: now });
+    await records.quiet();
+
+    // Stand on the exact opposite side of the Earth from the sun.
+    const date = new Date();
+    const sun = whereIsTheSun(date);
+    const lon = ((sun.ra - localSiderealDegrees(date, 0) + 720) % 360) - 180;
+    await initializeCosmos({}, { simulatedLocation: { lat: -sun.dec, lon } });
+    renderCosmicPlane(document.querySelector("#map"));
+
+    const canvas = document.querySelector("#map").shadowRoot.querySelector("canvas");
+    const { data } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+    let yellow = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] > 220 && data[i + 1] > 150 && data[i + 2] < 120) yellow++;
+    check("no sun is drawn while it's below the horizon", yellow === 0);
+  });
+</script>

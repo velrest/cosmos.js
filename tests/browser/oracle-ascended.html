@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Ascended prompt test</title>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { initializeCosmos } from "../../src/index.js";
+  import { check, run, wait } from "./harness.js";
+
+  run(async () => {
+    const records = await openAkashicRecords();
+    const now = Date.now();
+    records.save({ stars: {}, soul: { energy: 90, streak: 3 }, omen: null, nextOmenAt: now - 1000, location: null, settledAt: now });
+    await records.quiet();
+
+    await initializeCosmos({}, { simulatedLocation: { lat: 90, lon: 0 } });
+    await wait(1500);
+    const shadow = document.querySelector("[data-stellar-oracle]").shadowRoot;
+    check("the prompt opens by itself", shadow.querySelectorAll("[data-sign]").length === 3);
+    check("the button is disabled", shadow.querySelector("[data-opener]").disabled);
+    check("a forced prompt can't be closed", shadow.querySelector("[data-closer]").hidden);
+  });
+</script>

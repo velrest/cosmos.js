@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Storage test</title>
+<script type="module">
+  import { openAkashicRecords } from "../../src/akashic-records.js";
+  import { check, run } from "./harness.js";
+
+  run(async () => {
+    const tabA = await openAkashicRecords("two-tabs");
+    const tabB = await openAkashicRecords("two-tabs");
+    await tabA.load();
+    await tabB.load();
+    tabA.save({ stars: { Polaris: { data: { a: 1 }, pending: [] } }, soul: { energy: 40, streak: 0 } });
+    await tabA.quiet();
+    tabB.save({ stars: { Vega: { data: { b: 2 }, pending: [] } }, soul: { energy: 50, streak: 0 } });
+    await tabB.quiet();
+    const merged = await (await openAkashicRecords("two-tabs")).load();
+    check("a second tab doesn't erase the first tab's star", merged.stars.Polaris?.data.a === 1);
+    check("the second tab's star is kept", merged.stars.Vega?.data.b === 2);
+    check("the latest shared state wins", merged.soul.energy === 50);
+
+    const foreign = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("someone-elses", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    foreign.close();
+    const fallback = await openAkashicRecords("someone-elses");
+    fallback.save({ soul: { energy: 40, streak: 0 } });
+    await fallback.quiet();
+    check("a database without our store falls back to memory", (await fallback.load()).soul.energy === 40);
+  });
+</script>
